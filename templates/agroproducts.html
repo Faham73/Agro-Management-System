@@ -7,6 +7,13 @@
 {% block body %}
   <div class="agro-products-header">
     <div class="container py-5 text-center">
+      <h3 class="text-center">
+        {% if current_user.role == 'worker' %}
+          My Products
+        {% else %}
+          All Agro Products
+        {% endif %}
+      </h3>
       <h1 class="display-4 font-weight-bold text-white mb-3">Premium Agro Products</h1>
       <p class="lead text-light">Farm-fresh excellence delivered to your table</p>
     </div>
@@ -31,11 +38,12 @@
             <div class="card h-100 border-0 shadow-sm hover-animate">
               <div class="card-img-top position-relative overflow-hidden" style="height: 250px;">
                 <img src="{{ url_for('static', filename='uploads/' + p.image_filename) }}" class="img-fluid w-100 h-100 object-cover" alt="{{ p.productname }}" />
-                <div class="price-tag bg-success text-white px-3 py-1 position-absolute" style="top: 15px; right: 15px;">₹{{ p.price }}</div>
+                <div class="price-tag bg-success text-white px-3 py-1 position-absolute" style="top: 15px; right: 15px;">৳{{ p.price }}</div>
               </div>
               <div class="card-body">
                 <h5 class="card-title font-weight-bold text-dark mb-2">{{ p.productname }}</h5>
-                <p class="card-text text-muted mb-4">{{ p.productdesc }}</p><div class="card-footer bg-transparent border-top-0 pt-3">
+                <p class="card-text text-muted mb-4">{{ p.productdesc }}</p>
+                <div class="card-footer bg-transparent border-top-0 pt-3">
                   <div class="d-flex justify-content-between align-items-center flex-wrap">
                     <div class="seller-info pe-3 mb-2">
                       <p class="mb-1 text-muted small">
@@ -58,6 +66,7 @@
                         {% elif current_user.role == 'customer' %}
                           <!-- Customer Action -->
                           <a href="mailto:{{ p.email }}?subject=Purchase%20Inquiry:%20{{ p.productname }}" class="btn btn-success px-4 py-2" style="min-width: 120px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Purchase Item"><i class="fas fa-shopping-cart me-2"></i> Purchase</a>
+                          <a href="{{ url_for('add_to_cart', product_id=p.pid) }}" class="btn btn-success btn-sm float-right">Add to Cart</a>
                         {% endif %}
                       {% else %}
                         <!-- Guest Action -->
@@ -89,7 +98,7 @@
     .card-footer {
       background: linear-gradient(to right, #f8f9fa, #ffffff);
       padding: 1.25rem;
-      border-radius: 0 0 12px 12px ;
+      border-radius: 0 0 12px 12px;
     }
     .card:hover {
       transform: translateY(-5px);

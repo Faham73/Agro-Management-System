@@ -82,6 +82,33 @@ textarea {
     background-color: ghostwhite;
 }
 
+/* Cart page styles */
+.img-thumbnail {
+    max-width: 100%;
+    height: auto;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+/* Cart specific styles */
+.table td, .table th {
+    vertical-align: middle;
+}
+
+.img-thumbnail {
+    object-fit: cover;
+}
+
+.form-control[type="number"] {
+    text-align: center;
+}
+.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+}
+
+
 #btn {
     background-color: #7f5a83;
     background-image: linear-gradient(315deg, #7f5a83 0%, #0d324d 74%);

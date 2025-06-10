@@ -9,6 +9,7 @@ from flask_login import login_user,logout_user,login_manager,LoginManager
 from flask_login import login_required,current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from flask import session
 
 
 # MY db connection
@@ -98,10 +99,150 @@ def farmerdetails():
     query=Register.query.all()
     return render_template('farmerdetails.html',query=query)
 
+# For workers to see only their products
 @app.route('/agroproducts')
+@login_required
 def agroproducts():
-    user_products = AddAgroProduct.query.filter_by(username=current_user.username).all()
-    return render_template('agroproducts.html', query=user_products)
+    if current_user.role == 'worker':
+        products = AddAgroProduct.query.filter_by(user_id=current_user.id).all()
+    else:  # customers see all products
+        products = AddAgroProduct.query.all()
+    return render_template('agroproducts.html', query=products)
+
+
+# ADD TO CART
+@app.route('/add_to_cart/<int:product_id>')
+@login_required
+def add_to_cart(product_id):
+    if current_user.role != 'customer':
+        abort(403)
+
+    product = AddAgroProduct.query.get_or_404(product_id)
+
+    # Initialize cart in session if it doesn't exist
+    if 'cart' not in session or not isinstance(session['cart'], list):
+        session['cart'] = []
+
+    cart = session['cart']
+
+    # Ensure all cart items are dicts (cleaning legacy bad data)
+    cart = [item for item in cart if isinstance(item, dict)]
+
+    # Check if product already in cart
+    product_exists = False
+    for item in cart:
+        if item.get('product_id') == product_id:
+            item['quantity'] += 1
+            product_exists = True
+            break
+
+    if not product_exists:
+        cart.append({
+            'product_id': product_id,
+            'quantity': 1
+        })
+
+    session['cart'] = cart
+    session.modified = True  # make sure changes are saved
+
+    print("Cart after adding:", session.get('cart'))
+
+    flash(f'{product.productname} added to cart!', 'success')
+    return redirect(url_for('agroproducts'))
+
+
+
+@app.route('/cart')
+@login_required
+def view_cart():
+    if current_user.role != 'customer':
+        abort(403)
+    
+    cart_items = []
+    total = 0
+    
+    # Get products from cart in session
+    if 'cart' in session:
+        for item in session['cart']:
+            if isinstance(item, dict):
+                product_id = item.get('product_id')
+                quantity = item.get('quantity', 1)
+            elif isinstance(item, int):
+                product_id = item
+                quantity = 1
+            else:
+                print("Skipping unexpected cart item:", item)
+                continue
+
+            product = AddAgroProduct.query.get(product_id)
+            if product:
+                item_total = product.price * quantity
+                cart_items.append({
+                    'product': product,
+                    'quantity': quantity,
+                    'item_total': item_total
+                })
+                total += item_total
+
+
+    
+    return render_template('add_to_cart.html', cart_items=cart_items, total=total)
+
+@app.route('/remove_from_cart/<int:product_id>')
+@login_required
+def remove_from_cart(product_id):
+    if current_user.role != 'customer':
+        abort(403)
+    
+    if 'cart' in session:
+        cart = session['cart']
+        # Find and remove the item
+        for i, item in enumerate(cart):
+            if item['product_id'] == product_id:
+                product = AddAgroProduct.query.get_or_404(product_id)
+                flash(f'{product.productname} removed from cart!', 'info')
+                del cart[i]
+                break
+        session['cart'] = cart
+    
+    return redirect(url_for('view_cart'))
+
+@app.route('/update_cart/<int:product_id>', methods=['POST'])
+@login_required
+def update_cart(product_id):
+    if current_user.role != 'customer':
+        abort(403)
+    
+    new_quantity = int(request.form.get('quantity', 1))
+    if new_quantity < 1:
+        flash('Quantity must be at least 1', 'danger')
+        return redirect(url_for('view_cart'))
+    
+    if 'cart' in session:
+        cart = session['cart']
+        for item in cart:
+            if item['product_id'] == product_id:
+                item['quantity'] = new_quantity
+                break
+        session['cart'] = cart
+        flash('Cart updated successfully!', 'success')
+    
+    return redirect(url_for('view_cart'))
+
+@app.route('/clear_cart')
+@login_required
+def clear_cart():
+    session.pop('cart', None)
+    flash("Cart has been cleared.", "info")
+    return redirect(url_for('view_cart'))
+
+
+
+@app.route('/checkout')
+@login_required
+def checkout():
+    # Implement your checkout logic here
+    pass
 
 @app.route('/addagroproduct', methods=['POST','GET'])
 @login_required
