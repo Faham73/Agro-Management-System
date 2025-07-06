@@ -1,78 +1,218 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Edit Agro Product
-{% endblock title %}
+  Edit Agro Product
+{% endblock %}
 
 {% block body %}
-<!-- ======= Edit Product Section ======= -->
-<section id="edit-product" class="edit-product section-bg">
-  <div class="container" data-aos="fade-up">
-    <div class="section-title">
-      <h2>Edit Product</h2>
-      <p>Update your agricultural product details</p>
-    </div>
+  <style>
+    :root {
+      --primary-color: #0cbaba;
+      --primary-dark: #089494;
+      --primary-light: #d6f5f5;
+      --secondary-color: #f8f9fa;
+      --accent-color: #ff7e33;
+    }
+    
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .card {
+      border: none;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-header {
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+      color: white;
+      padding: 1.5rem;
+      border-bottom: none;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary-color);
+      border-color: var(--primary-color);
+      padding: 0.5rem 1.5rem;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--primary-dark);
+      border-color: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+    
+    .btn-outline-secondary {
+      transition: all 0.3s ease;
+    }
+    
+    .btn-outline-secondary:hover {
+      transform: translateY(-2px);
+    }
+    
+    .form-control:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 0.25rem rgba(12, 186, 186, 0.25);
+    }
+    
+    .form-floating > label {
+      color: #6c757d;
+    }
+    
+    .current-image {
+      border: 2px dashed var(--primary-light);
+      border-radius: 8px;
+      padding: 5px;
+      background-color: white;
+    }
+    
+    footer {
+      background-color: white;
+      padding: 2rem 0;
+      margin-top: 3rem;
+    }
+    
+    .developer-link {
+      color: var(--primary-dark);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+    
+    .developer-link:hover {
+      color: var(--primary-color);
+    }
+    .input-group-text {
+      background-color: var(--primary-light);
+      color: var(--primary-dark);
+      font-weight: bold;
+    }
+    
+    /* Adjust floating label position when using input group */
+    .form-floating > .form-control:not(:placeholder-shown) ~ label,
+    .form-floating > .form-control:focus ~ label,
+    .form-floating > .form-select ~ label {
+      transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+    }
+  </style>
 
-    <div class="row justify-content-center">
-      <div class="col-lg-8">
-        <div class="card">
-          <div class="card-body">
-            <form action="/updateagroproduct/{{ product.pid }}" method="post" enctype="multipart/form-data" class="php-email-form">
-              <!-- Farmer Info -->
-              <div class="row">
-                <div class="col-md-6 form-group">
-                  <label>Farmer Name</label>
-                  <input type="text" name="username" class="form-control" value="{{ product.username }}" readonly>
+  <!-- ======= Edit Product Section ======= -->
+  <section id="edit-product" class="edit-product py-5">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-header text-center">
+              <h2 class="mb-2"><i class="fas fa-edit me-2"></i>Edit Product</h2>
+              <p class="mb-0">Update your agricultural product details</p>
+            </div>
+
+            <div class="card-body p-4 p-md-5">
+              <form action="/updateagroproduct/{{ product.pid }}" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                <!-- Farmer Info -->
+                <div class="row mb-4">
+                  <div class="col-md-6 mb-3">
+                    <div class="form-floating">
+                      <input type="text" name="username" class="form-control" id="username" value="{{ product.username }}" readonly />
+                      <label for="username"><i class="fas fa-user me-1"></i> Farmer Name</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <div class="form-floating">
+                      <input type="email" class="form-control" name="email" id="email" value="{{ product.email }}" readonly />
+                      <label for="email"><i class="fas fa-envelope me-1"></i> Farmer Email</label>
+                    </div>
+                  </div>
                 </div>
-                <div class="col-md-6 form-group mt-3 mt-md-0">
-                  <label>Farmer Email</label>
-                  <input type="email" class="form-control" name="email" value="{{ product.email }}" readonly>
+
+                <!-- Product Info -->
+                <div class="mb-4">
+                  <div class="form-floating">
+                    <input type="text" class="form-control" name="productname" id="productname" value="{{ product.productname }}" required />
+                    <label for="productname"><i class="fas fa-tag me-1"></i> Product Name</label>
+                    <div class="invalid-feedback">Please provide a product name.</div>
+                  </div>
                 </div>
-              </div>
 
-              <!-- Product Info -->
-              <div class="form-group mt-3">
-                <label>Product Name</label>
-                <input type="text" class="form-control" name="productname" value="{{ product.productname }}" required>
-              </div>
-
-              <div class="form-group mt-3">
-                <label>Product Description</label>
-                <textarea class="form-control" name="productdesc" rows="5" required>{{ product.productdesc }}</textarea>
-              </div>
-
-              <div class="row">
-                <div class="col-md-6 form-group mt-3">
-                  <label>Price (₹)</label>
-                  <input type="number" step="0.01" class="form-control" name="price" value="{{ product.price }}" required>
+                <div class="mb-4">
+                  <div class="form-floating">
+                    <textarea class="form-control" name="productdesc" id="productdesc" style="height: 120px" required>{{ product.productdesc }}</textarea>
+                    <label for="productdesc"><i class="fas fa-align-left me-1"></i> Product Description</label>
+                    <div class="invalid-feedback">Please provide a product description.</div>
+                  </div>
                 </div>
-                <div class="col-md-6 form-group mt-3">
-                  <label>Product Image</label>
-                  <input type="file" class="form-control" name="productimage">
-                  <small class="text-muted">Current: {{ product.image_filename }}</small>
-                </div>
-              </div>
 
-              <div class="text-center mt-4">
-                <button type="submit" class="btn btn-primary">Update Product</button>
-                <a href="/agroproducts" class="btn btn-secondary ms-2">Cancel</a>
-              </div>
-            </form>
+                <div class="row mb-4">
+                  <div class="col-md-6 mb-3">
+                    <div class="form-floating">
+                      <input type="number" step="0.01" class="form-control" name="price" id="price" value="{{ product.price }}" required />
+                      <label for="price"><i class="fas fa-money-bill-wave me-1"></i> Price (৳)</label>
+                      <div class="invalid-feedback">Please provide a valid price.</div>
+                    </div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <div class="form-group">
+                      <label for="productimage" class="form-label mb-2"><i class="fas fa-image me-1"></i> Product Image</label>
+                      <input class="form-control" type="file" id="productimage" name="productimage" />
+                      <div class="form-text mt-1">Current: {{ product.image_filename }}</div>
+                      <div class="mt-2 text-center">
+                        {% if product.image_filename %}
+                          <img src="{{ url_for('static', filename='uploads/' + product.image_filename) }}" alt="Current product image" class="current-image" style="max-height: 120px;" />
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                  <button type="button" class="btn btn-outline-secondary px-4 me-md-2" onclick="window.history.back()"><i class="fas fa-times me-2"></i> Cancel</button>
+                  <button type="submit" class="btn btn-primary px-4"><i class="fas fa-save me-2"></i> Update Product</button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-</section><!-- End Edit Product Section -->
+  </section>
 
-<!-- ======= Footer ======= -->
-<footer id="footer">
-  <div class="footer-top"></div>
-  <div class="container">
-    <div class="credits">
-      <br>
-      Developed by <a href="/">Faham</a>
+  <!-- Footer -->
+  <footer class="text-center">
+    <div class="container">
+      <div class="pt-3">
+        <span class="text-muted">Developed by <a href="/" class="developer-link">Faham</a></span>
+      </div>
     </div>
-  </div>
-</footer><!-- End Footer -->
-{% endblock body %}
+  </footer>
+
+  <!-- Form validation script -->
+  <script>
+    ;(function () {
+      'use strict'
+      var forms = document.querySelectorAll('.needs-validation')
+      Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener(
+          'submit',
+          function (event) {
+            if (!form.checkValidity()) {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+          },
+          false
+        )
+      })
+    })()
+  </script>
+{% endblock %}

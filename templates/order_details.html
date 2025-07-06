@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  Order Details | FarmToTable
+{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+  <div class="row">
+    <div class="col-lg-8">
+      <h2 class="mb-4">Order #{{ order.payment_id }}</h2>
+      
+      <div class="card mb-4">
+        <div class="card-header">
+          <h4>Order Items</h4>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Seller</th>
+                  <th>Price</th>
+                  <th>Quantity</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in items %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      {% if item.image_filename %}
+                      <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" 
+                           class="img-thumbnail me-3" style="width: 60px; height: 60px;">
+                      {% endif %}
+                      {{ item.productname }}
+                    </div>
+                  </td>
+                  <td>{{ item.seller_name }}</td>
+                  <td>৳{{ "%.2f"|format(item.price) }}</td>
+                  <td>{{ item.quantity }}</td>
+                  <td>৳{{ "%.2f"|format(item.price * item.quantity) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h4>Order Summary</h4>
+        </div>
+        <div class="card-body">
+          <p><strong>Order Date:</strong> {{ order.payment_date.strftime('%b %d, %Y %I:%M %p') }}</p>
+          <p><strong>Delivery Address:</strong> {{ order.delivery_address }}</p>
+          <p><strong>Contact Number:</strong> {{ order.contact_number }}</p>
+          <hr>
+          <h5 class="text-end">Total: ৳{{ "%.2f"|format(order.total_amount) }}</h5>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h4>Order Status</h4>
+        </div>
+        <div class="card-body">
+          <ul class="list-group list-group-flush">
+            {% if tracking %}
+              {% for status in tracking %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ status.status|title }}</span>
+                <small class="text-muted">{{ status.update_time.strftime('%b %d, %I:%M %p') }}</small>
+              </li>
+              {% endfor %}
+            {% else %}
+              <li class="list-group-item">No status updates available</li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

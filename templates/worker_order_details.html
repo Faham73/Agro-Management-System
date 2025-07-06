@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  Order Details | FarmToTable
+{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Order #{{ order.payment_id }}</h2>
+        <span class="badge 
+          {% if tracking and tracking[0].status == 'delivered' %}bg-success
+          {% elif tracking and tracking[0].status == 'cancelled' %}bg-danger
+          {% elif tracking and tracking[0].status == 'shipped' %}bg-primary
+          {% else %}bg-secondary{% endif %}">
+          {{ tracking[0].status|title if tracking else 'Processing' }}
+        </span>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Products Ordered (Your Items)</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Price</th>
+                  <th>Quantity</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in items %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      {% if item.image_filename %}
+                      <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" 
+                           alt="{{ item.productname }}" class="img-thumbnail me-3" style="width: 60px; height: 60px;">
+                      {% endif %}
+                      <div>
+                        <h6 class="mb-0">{{ item.productname }}</h6>
+                      </div>
+                    </div>
+                  </td>
+                  <td>৳{{ "%.2f"|format(item.price) }}</td>
+                  <td>{{ item.quantity }}</td>
+                  <td>৳{{ "%.2f"|format(item.price * item.quantity) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Customer Information</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6>Customer Name</h6>
+              <p>{{ order.customer_name }}</p>
+            </div>
+            <div class="col-md-6">
+              <h6>Customer Email</h6>
+              <p>{{ order.customer_email }}</p>
+            </div>
+            <div class="col-md-6">
+              <h6>Contact Number</h6>
+              <p>{{ order.contact_number or 'Not provided' }}</p>
+            </div>
+            <div class="col-md-6">
+              <h6>Delivery Address</h6>
+              <p>{{ order.delivery_address or 'Not provided' }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Update Order Status</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('update_order_status', payment_id=order.payment_id) }}">
+            <div class="mb-3">
+              <label for="status" class="form-label">Status</label>
+              <select class="form-select" id="status" name="status" required>
+                {% for value, label in status_options %}
+                <option value="{{ value }}" 
+                  {% if tracking and tracking[0].status == value %}selected{% endif %}>
+                  {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="notes" class="form-label">Notes (Optional)</label>
+              <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+              Update Status
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Order Timeline</h5>
+        </div>
+        <div class="card-body">
+          <div class="timeline">
+            {% for track in tracking %}
+            <div class="timeline-item {% if loop.first %}active{% endif %}">
+              <div class="timeline-content">
+                <div class="timeline-header">
+                  <span class="badge 
+                    {% if track.status == 'delivered' %}bg-success
+                    {% elif track.status == 'cancelled' %}bg-danger
+                    {% elif track.status == 'shipped' %}bg-primary
+                    {% else %}bg-secondary{% endif %}">
+                    {{ track.status|title }}
+                  </span>
+                  <small class="text-muted ms-2">
+                    {{ track.update_time.strftime('%b %d, %I:%M %p') }}
+                  </small>
+                </div>
+                {% if track.notes %}
+                <p class="timeline-notes mt-2">{{ track.notes }}</p>
+                {% endif %}
+              </div>
+            </div>
+            {% else %}
+            <div class="text-center py-3">
+              <p class="text-muted">No tracking information available</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .timeline {
+    position: relative;
+    padding-left: 1.5rem;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #e9ecef;
+  }
+  .timeline-item {
+    position: relative;
+    padding-bottom: 1.5rem;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem;
+    top: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #adb5bd;
+    z-index: 1;
+  }
+  .timeline-item.active::before {
+    background-color: var(--bs-primary);
+  }
+  .timeline-content {
+    padding-left: 0.5rem;
+  }
+  .timeline-notes {
+    font-size: 0.875rem;
+    color: #6c757d;
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 4px;
+  }
+</style>
+{% endblock %}

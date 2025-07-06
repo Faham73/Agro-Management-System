@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  Checkout | FarmToTable
+{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+  <div class="row">
+    <div class="col-lg-8">
+      <h2 class="mb-4">Checkout</h2>
+      
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">Order Summary</h4>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Price</th>
+                  <th>Quantity</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in items %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      {% if item.image_filename %}
+                      <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" 
+                           alt="{{ item.productname }}" class="img-thumbnail me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                      {% endif %}
+                      <div>
+                        <h6 class="mb-0">{{ item.productname }}</h6>
+                      </div>
+                    </div>
+                  </td>
+                  <td>৳{{ "%.2f"|format(item.price) }}</td>
+                  <td>{{ item.quantity }}</td>
+                  <td>৳{{ "%.2f"|format(item.price * item.quantity) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">Payment</h4>
+        </div>
+        <div class="card-body">
+          <div class="mb-4">
+            <h5>Order Total</h5>
+            <h3 class="text-primary">৳{{ "%.2f"|format(total) }}</h3>
+          </div>
+
+          <form method="POST" action="{{ url_for('process_payment') }}">
+            <div class="mb-3">
+              <label class="form-label">Payment Method</label>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="paymentMethod" id="cod" value="cod" checked>
+                <label class="form-check-label" for="cod">
+                  Cash on Delivery
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="paymentMethod" id="card" value="card">
+                <label class="form-check-label" for="card">
+                  Credit/Debit Card
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2">
+              Complete Order
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

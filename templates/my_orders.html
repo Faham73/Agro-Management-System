@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  My Orders | FarmToTable
+{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+  <div class="row">
+    <div class="col-12">
+      <h2 class="mb-4">My Orders</h2>
+      
+      {% if orders %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Order ID</th>
+              <th>Date</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+            <tr>
+              <td>#{{ order.payment_id }}</td>
+              <td>{{ order.payment_date.strftime('%b %d, %Y') }}</td>
+              <td>{{ order.item_count }} item(s)</td>
+              <td>৳{{ "%.2f"|format(order.total_amount) }}</td>
+              <!-- In my_orders.html -->
+<td>
+  <span class="badge 
+    {% if order.current_status == 'delivered' %}bg-success
+    {% elif order.current_status == 'cancelled' %}bg-danger
+    {% elif order.current_status == 'shipped' %}bg-primary
+    {% else %}bg-secondary{% endif %}">
+    {{ order.current_status|title if order.current_status else 'Processing' }}
+  </span>
+</td>
+              <td>
+                <a href="{{ url_for('order_details', payment_id=order.payment_id) }}" 
+                    class="btn btn-sm btn-outline-primary">
+                    View Details
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-info">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-info-circle me-3 fa-2x"></i>
+          <div>
+            <h4 class="mb-1">No orders yet</h4>
+            <p class="mb-0">Your order history will appear here once you make a purchase.</p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

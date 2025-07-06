@@ -10,12 +10,15 @@ from flask_login import login_required,current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from flask import session
+from sqlalchemy import text
+from flask import send_from_directory
+from flask import request, flash, redirect, url_for, render_template
 
 
 # MY db connection
 local_server= True
 app = Flask(__name__)
-app.secret_key='harshithbhaskar'
+app.secret_key='faham73'
 
 
 # this is for getting unique user access
@@ -86,11 +89,24 @@ class Register(db.Model):
     address=db.Column(db.String(50))
     farming=db.Column(db.String(50))
 
+class OrderTracking(db.Model):
+    __tablename__ = 'order_tracking'
+    
+    tracking_id = db.Column(db.Integer, primary_key=True)
+    payment_id = db.Column(db.Integer, db.ForeignKey('payments.payment_id'))
+    status = db.Column(db.String(20))
+    update_time = db.Column(db.DateTime, default=datetime.utcnow)
+    notes = db.Column(db.Text)
+
     
 
 @app.route('/')
 def index(): 
     return render_template('index.html')
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('static', filename)
 
 @app.route('/farmerdetails')
 @login_required
@@ -104,10 +120,12 @@ def farmerdetails():
 @login_required
 def agroproducts():
     if current_user.role == 'worker':
-        products = AddAgroProduct.query.filter_by(user_id=current_user.id).all()
+        products = AddAgroProduct.query.filter_by(email=current_user.email).all()
     else:  # customers see all products
         products = AddAgroProduct.query.all()
     return render_template('agroproducts.html', query=products)
+
+
 
 
 # ADD TO CART
@@ -117,96 +135,146 @@ def add_to_cart(product_id):
     if current_user.role != 'customer':
         abort(403)
 
-    product = AddAgroProduct.query.get_or_404(product_id)
+    # Get or create cart for user
+    cart = db.session.execute(
+        text("SELECT cart_id FROM carts WHERE user_id = :user_id"),
+        {'user_id': current_user.id}
+    ).fetchone()
 
-    # Initialize cart in session if it doesn't exist
-    if 'cart' not in session or not isinstance(session['cart'], list):
-        session['cart'] = []
-
-    cart = session['cart']
-
-    # Ensure all cart items are dicts (cleaning legacy bad data)
-    cart = [item for item in cart if isinstance(item, dict)]
+    if not cart:
+        db.session.execute(
+            text("INSERT INTO carts (user_id) VALUES (:user_id)"),
+            {'user_id': current_user.id}
+        )
+        db.session.commit()
+        cart_id = db.session.execute(
+            text("SELECT LAST_INSERT_ID()")
+        ).fetchone()[0]
+    else:
+        cart_id = cart[0]
 
     # Check if product already in cart
-    product_exists = False
-    for item in cart:
-        if item.get('product_id') == product_id:
-            item['quantity'] += 1
-            product_exists = True
-            break
+    existing_item = db.session.execute(
+        text("""
+        SELECT cart_item_id, quantity 
+        FROM cart_items 
+        WHERE cart_id = :cart_id AND product_id = :product_id
+        """),
+        {'cart_id': cart_id, 'product_id': product_id}
+    ).fetchone()
 
-    if not product_exists:
-        cart.append({
-            'product_id': product_id,
-            'quantity': 1
-        })
+    if existing_item:
+        # Update quantity if product exists
+        db.session.execute(
+            text("""
+            UPDATE cart_items 
+            SET quantity = quantity + 1 
+            WHERE cart_item_id = :cart_item_id
+            """),
+            {'cart_item_id': existing_item[0]}
+        )
+    else:
+        # Add new item to cart
+        db.session.execute(
+            text("""
+            INSERT INTO cart_items (cart_id, product_id, quantity)
+            VALUES (:cart_id, :product_id, 1)
+            """),
+            {'cart_id': cart_id, 'product_id': product_id}
+        )
+    
+    db.session.commit()
 
-    session['cart'] = cart
-    session.modified = True  # make sure changes are saved
-
-    print("Cart after adding:", session.get('cart'))
-
+    product = AddAgroProduct.query.get_or_404(product_id)
     flash(f'{product.productname} added to cart!', 'success')
     return redirect(url_for('agroproducts'))
 
-
-
+# VIEW CART
 @app.route('/cart')
 @login_required
 def view_cart():
     if current_user.role != 'customer':
         abort(403)
     
+    # Get user's cart
+    cart = db.session.execute(
+        text("SELECT cart_id FROM carts WHERE user_id = :user_id"),
+        {'user_id': current_user.id}
+    ).fetchone()
+
     cart_items = []
-    total = 0
+    total = 0.0
     
-    # Get products from cart in session
-    if 'cart' in session:
-        for item in session['cart']:
-            if isinstance(item, dict):
-                product_id = item.get('product_id')
-                quantity = item.get('quantity', 1)
-            elif isinstance(item, int):
-                product_id = item
-                quantity = 1
-            else:
-                print("Skipping unexpected cart item:", item)
-                continue
+    if cart:
+        # Get all items in cart with product details using JOIN
+        items = db.session.execute(
+            text("""
+            SELECT ci.quantity, p.pid, p.productname, p.price, p.image_filename, p.username
+            FROM cart_items ci
+            JOIN addagroproducts p ON ci.product_id = p.pid
+            WHERE ci.cart_id = :cart_id
+            """),
+            {'cart_id': cart[0]}
+        ).fetchall()
 
-            product = AddAgroProduct.query.get(product_id)
-            if product:
-                item_total = product.price * quantity
-                cart_items.append({
-                    'product': product,
-                    'quantity': quantity,
-                    'item_total': item_total
-                })
-                total += item_total
-
-
+        for item in items:
+            quantity = item[0]
+            item_total = float(item[3]) * quantity
+            cart_items.append({
+                'product': {
+                    'pid': item[1],
+                    'productname': item[2],
+                    'price': item[3],
+                    'image_filename': item[4],
+                    'username': item[5]
+                },
+                'quantity': quantity,
+                'item_total': item_total
+            })
+            total += item_total
     
     return render_template('add_to_cart.html', cart_items=cart_items, total=total)
 
+# REMOVE FROM CART
 @app.route('/remove_from_cart/<int:product_id>')
 @login_required
 def remove_from_cart(product_id):
     if current_user.role != 'customer':
         abort(403)
     
-    if 'cart' in session:
-        cart = session['cart']
-        # Find and remove the item
-        for i, item in enumerate(cart):
-            if item['product_id'] == product_id:
-                product = AddAgroProduct.query.get_or_404(product_id)
-                flash(f'{product.productname} removed from cart!', 'info')
-                del cart[i]
-                break
-        session['cart'] = cart
+    # Get user's cart
+    cart = db.session.execute(
+        text("SELECT cart_id FROM carts WHERE user_id = :user_id"),
+        {'user_id': current_user.id}
+    ).fetchone()
+
+    if cart:
+        # Get product name before deleting for flash message
+        product = db.session.execute(
+            text("""
+            SELECT p.productname 
+            FROM addagroproducts p
+            WHERE p.pid = :product_id
+            """),
+            {'product_id': product_id}
+        ).fetchone()
+
+        # Delete the item
+        db.session.execute(
+            text("""
+            DELETE FROM cart_items 
+            WHERE cart_id = :cart_id AND product_id = :product_id
+            """),
+            {'cart_id': cart[0], 'product_id': product_id}
+        )
+        db.session.commit()
+
+        if product:
+            flash(f'{product[0]} removed from cart!', 'info')
     
     return redirect(url_for('view_cart'))
 
+# UPDATE CART
 @app.route('/update_cart/<int:product_id>', methods=['POST'])
 @login_required
 def update_cart(product_id):
@@ -218,48 +286,409 @@ def update_cart(product_id):
         flash('Quantity must be at least 1', 'danger')
         return redirect(url_for('view_cart'))
     
-    if 'cart' in session:
-        cart = session['cart']
-        for item in cart:
-            if item['product_id'] == product_id:
-                item['quantity'] = new_quantity
-                break
-        session['cart'] = cart
+    # Get user's cart
+    cart = db.session.execute(
+        text("SELECT cart_id FROM carts WHERE user_id = :user_id"),
+        {'user_id': current_user.id}
+    ).fetchone()
+
+    if cart:
+        db.session.execute(
+            text("""
+            UPDATE cart_items 
+            SET quantity = :quantity 
+            WHERE cart_id = :cart_id AND product_id = :product_id
+            """),
+            {'quantity': new_quantity, 'cart_id': cart[0], 'product_id': product_id}
+        )
+        db.session.commit()
         flash('Cart updated successfully!', 'success')
     
     return redirect(url_for('view_cart'))
 
+# CLEAR CART
 @app.route('/clear_cart')
 @login_required
 def clear_cart():
-    session.pop('cart', None)
-    flash("Cart has been cleared.", "info")
+    if current_user.role != 'customer':
+        abort(403)
+    
+    # Get user's cart
+    cart = db.session.execute(
+        text("SELECT cart_id FROM carts WHERE user_id = :user_id"),
+        {'user_id': current_user.id}
+    ).fetchone()
+
+    if cart:
+        db.session.execute(
+            text("DELETE FROM cart_items WHERE cart_id = :cart_id"),
+            {'cart_id': cart[0]}
+        )
+        db.session.commit()
+        flash("Cart has been cleared.", "info")
+    
     return redirect(url_for('view_cart'))
 
-
-
+# CHECKOUT
 @app.route('/checkout')
 @login_required
 def checkout():
-    # Implement your checkout logic here
-    pass
+    if current_user.role != 'customer':
+        abort(403)
+    
+    # Get user's cart items
+    cart = db.session.execute(
+        text("SELECT cart_id FROM carts WHERE user_id = :user_id"),
+        {'user_id': current_user.id}
+    ).fetchone()
+
+    if not cart:
+        flash('Your cart is empty!', 'warning')
+        return redirect(url_for('agroproducts'))
+
+    # Get cart items with product details
+    items = db.session.execute(
+        text("""
+        SELECT ci.quantity, p.pid, p.productname, p.price, p.image_filename
+        FROM cart_items ci
+        JOIN addagroproducts p ON ci.product_id = p.pid
+        WHERE ci.cart_id = :cart_id
+        """),
+        {'cart_id': cart[0]}
+    ).fetchall()
+
+    # Calculate total
+    total = sum(float(item[3]) * item[0] for item in items)
+    
+    return render_template('checkout.html', items=items, total=total)
+
+@app.route('/process_payment', methods=['POST'])
+@login_required
+def process_payment():
+    if current_user.role != 'customer':
+        abort(403)
+    
+    # Get user's cart
+    cart = db.session.execute(
+        text("SELECT cart_id FROM carts WHERE user_id = :user_id"),
+        {'user_id': current_user.id}
+    ).fetchone()
+
+    if not cart:
+        flash('Your cart is empty!', 'danger')
+        return redirect(url_for('agroproducts'))
+
+    # Get cart items
+    items = db.session.execute(
+        text("""
+        SELECT product_id, quantity, price 
+        FROM cart_items ci
+        JOIN addagroproducts p ON ci.product_id = p.pid
+        WHERE ci.cart_id = :cart_id
+        """),
+        {'cart_id': cart[0]}
+    ).fetchall()
+
+    total = sum(float(item[2]) * item[1] for item in items)
+    
+    try:
+        # Create payment record
+        db.session.execute(
+            text("""
+            INSERT INTO payments (user_id, total_amount, payment_status)
+            VALUES (:user_id, :total, 'completed')
+            """),
+            {'user_id': current_user.id, 'total': total}
+        )
+        db.session.commit()
+        
+        # Get the payment ID
+        payment_id = db.session.execute(
+            text("SELECT LAST_INSERT_ID()")
+        ).fetchone()[0]
+        
+        # Create order items
+        for item in items:
+            db.session.execute(
+                text("""
+                INSERT INTO order_items (payment_id, product_id, quantity, price)
+                VALUES (:payment_id, :product_id, :quantity, :price)
+                """),
+                {
+                    'payment_id': payment_id,
+                    'product_id': item[0],
+                    'quantity': item[1],
+                    'price': item[2]
+                }
+            )
+        
+        # Clear the cart
+        db.session.execute(
+            text("DELETE FROM cart_items WHERE cart_id = :cart_id"),
+            {'cart_id': cart[0]}
+        )
+        db.session.commit()
+        
+        flash('Payment processed successfully!', 'success')
+        return redirect(url_for('payment_success', payment_id=payment_id))
+    
+    except Exception as e:
+        db.session.rollback()
+        flash('Payment failed. Please try again.', 'danger')
+        return redirect(url_for('checkout'))
+
+@app.route('/payment_success/<int:payment_id>')
+@login_required
+def payment_success(payment_id):
+    # Get payment details
+    payment = db.session.execute(
+        text("""
+        SELECT p.payment_id, p.total_amount, p.payment_date, 
+               u.username, u.email
+        FROM payments p
+        JOIN user u ON p.user_id = u.id
+        WHERE p.payment_id = :payment_id
+        """),
+        {'payment_id': payment_id}
+    ).fetchone()
+
+    # Get order items
+    items = db.session.execute(
+        text("""
+        SELECT oi.quantity, oi.price, p.productname, p.image_filename
+        FROM order_items oi
+        JOIN addagroproducts p ON oi.product_id = p.pid
+        WHERE oi.payment_id = :payment_id
+        """),
+        {'payment_id': payment_id}
+    ).fetchall()
+
+    return render_template('payment_success.html', 
+                         payment=payment, 
+                         items=items)
+    
+    
+@app.route('/my_orders')
+@login_required
+def my_orders():
+    if current_user.role != 'customer':
+        abort(403)
+    
+    # Get orders with their LATEST status
+    orders = db.session.execute(
+        text("""
+        SELECT p.payment_id, p.total_amount, p.payment_date, 
+               (SELECT status FROM order_tracking 
+                WHERE payment_id = p.payment_id 
+                ORDER BY update_time DESC LIMIT 1) AS current_status
+        FROM payments p
+        WHERE p.user_id = :user_id
+        ORDER BY p.payment_date DESC
+        """),
+        {'user_id': current_user.id}
+    ).fetchall()
+
+    return render_template('my_orders.html', orders=orders)
+
+@app.route('/order_details/<int:payment_id>')
+@login_required
+def order_details(payment_id):
+    if current_user.role != 'customer':
+        abort(403)
+    
+    # Verify the order belongs to the current user
+    order = db.session.execute(
+        text("SELECT 1 FROM payments WHERE payment_id = :payment_id AND user_id = :user_id"),
+        {'payment_id': payment_id, 'user_id': current_user.id}
+    ).fetchone()
+
+    if not order:
+        abort(404)  # Changed from 403 to 404 for better UX
+
+    # Get order details
+    order_info = db.session.execute(
+        text("""
+        SELECT p.payment_id, p.total_amount, p.payment_date, p.delivery_address,
+               p.contact_number, u.username AS seller_name
+        FROM payments p
+        JOIN order_items oi ON p.payment_id = oi.payment_id
+        JOIN addagroproducts ap ON oi.product_id = ap.pid
+        JOIN user u ON ap.worker_id = u.id
+        WHERE p.payment_id = :payment_id AND p.user_id = :user_id
+        LIMIT 1
+        """),
+        {'payment_id': payment_id, 'user_id': current_user.id}
+    ).fetchone()
+
+    # Get all items in the order
+    items = db.session.execute(
+        text("""
+        SELECT oi.quantity, oi.price, ap.productname, ap.image_filename,
+               u.username AS seller_name
+        FROM order_items oi
+        JOIN addagroproducts ap ON oi.product_id = ap.pid
+        JOIN user u ON ap.worker_id = u.id
+        WHERE oi.payment_id = :payment_id
+        """),
+        {'payment_id': payment_id}
+    ).fetchall()
+
+    # Get tracking history
+    tracking = db.session.execute(
+        text("""
+        SELECT status, update_time, notes
+        FROM order_tracking
+        WHERE payment_id = :payment_id
+        ORDER BY update_time DESC
+        """),
+        {'payment_id': payment_id}
+    ).fetchall()
+
+    return render_template('order_details.html',
+                         order=order_info,
+                         items=items,
+                         tracking=tracking)
+
+
+@app.route('/orders_received')
+@login_required
+def orders_received():
+    if current_user.role != 'worker':
+        abort(403)
+    
+    # Get all orders containing this worker's products
+    orders = db.session.execute(
+        text("""
+        SELECT DISTINCT p.payment_id, p.payment_date, p.total_amount, 
+               u.username AS customer_name, u.email AS customer_email,
+               MAX(t.status) AS current_status
+        FROM payments p
+        JOIN order_items oi ON p.payment_id = oi.payment_id
+        JOIN addagroproducts ap ON oi.product_id = ap.pid
+        JOIN user u ON p.user_id = u.id
+        LEFT JOIN order_tracking t ON p.payment_id = t.payment_id
+        WHERE ap.worker_id = :worker_id
+        GROUP BY p.payment_id
+        ORDER BY p.payment_date DESC
+        """),
+        {'worker_id': current_user.id}
+    ).fetchall()
+
+    return render_template('orders_received.html', orders=orders)
+
+@app.route('/worker_order_details/<int:payment_id>')
+@login_required
+def worker_order_details(payment_id):
+    if current_user.role != 'worker':
+        abort(403)
+    
+    # Verify the order contains this worker's products
+    order_exists = db.session.execute(
+        text("""
+        SELECT 1 FROM order_items oi
+        JOIN addagroproducts ap ON oi.product_id = ap.pid
+        WHERE oi.payment_id = :payment_id AND ap.worker_id = :worker_id
+        LIMIT 1
+        """),
+        {'payment_id': payment_id, 'worker_id': current_user.id}
+    ).fetchone()
+
+    if not order_exists:
+        abort(403)
+
+    # Get order details
+    order_info = db.session.execute(
+        text("""
+        SELECT p.payment_id, p.payment_date, p.total_amount, 
+               p.delivery_address, p.contact_number,
+               u.username AS customer_name, u.email AS customer_email
+        FROM payments p
+        JOIN user u ON p.user_id = u.id
+        WHERE p.payment_id = :payment_id
+        """),
+        {'payment_id': payment_id}
+    ).fetchone()
+
+    # Get order items (only this worker's products)
+    items = db.session.execute(
+        text("""
+        SELECT oi.quantity, oi.price, ap.productname, ap.image_filename,
+               oi.order_item_id
+        FROM order_items oi
+        JOIN addagroproducts ap ON oi.product_id = ap.pid
+        WHERE oi.payment_id = :payment_id AND ap.worker_id = :worker_id
+        """),
+        {'payment_id': payment_id, 'worker_id': current_user.id}
+    ).fetchall()
+
+    # Get tracking history for this order
+    tracking = db.session.execute(
+        text("""
+        SELECT status, update_time, notes
+        FROM order_tracking
+        WHERE payment_id = :payment_id
+        ORDER BY update_time DESC
+        """),
+        {'payment_id': payment_id}
+    ).fetchall()
+
+    # Status options for the form
+    status_options = [
+        ('processing', 'Processing'),
+        ('shipped', 'Shipped'),
+        ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled')
+    ]
+
+    return render_template('worker_order_details.html',
+                         order=order_info,
+                         items=items,
+                         tracking=tracking,
+                         status_options=status_options)
+
+@app.route('/update_order_status/<int:payment_id>', methods=['POST'])
+@login_required
+def update_order_status(payment_id):
+    if current_user.role != 'worker':
+        abort(403)
+    
+    new_status = request.form.get('status')
+    notes = request.form.get('notes', '')
+
+    try:
+        db.session.execute(
+            text("""
+            INSERT INTO order_tracking (payment_id, status, notes)
+            VALUES (:payment_id, :status, :notes)
+            """),
+            {
+                'payment_id': payment_id,
+                'status': new_status,
+                'notes': notes
+            }
+        )
+        db.session.commit()
+        flash('Order status updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating status: {str(e)}', 'danger')
+    
+    return redirect(url_for('worker_order_details', payment_id=payment_id))
 
 @app.route('/addagroproduct', methods=['POST','GET'])
 @login_required
 def addagroproduct():
     if request.method == "POST":
-        # Get form data (don't get username/email from form - use current_user)
         productname = request.form.get('productname')
         productdesc = request.form.get('productdesc')
         price = request.form.get('price')
         
-        # Validate required fields
         if not all([productname, productdesc, price]):
             flash('Please fill all required fields', 'danger')
             return redirect(request.url)
         
         try:
-            price = float(price)  # Convert price to float
+            price = float(price)
             if price <= 0:
                 flash('Price must be greater than 0', 'danger')
                 return redirect(request.url)
@@ -267,56 +696,53 @@ def addagroproduct():
             flash('Invalid price format', 'danger')
             return redirect(request.url)
         
-        # Handle file upload
         if 'productimage' not in request.files:
             flash('No image selected', 'danger')
             return redirect(request.url)
-            
+        
         file = request.files['productimage']
         
         if file.filename == '':
             flash('No image selected', 'danger')
             return redirect(request.url)
-            
+        
         if file and allowed_file(file.filename):
-            # Generate unique filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             original_filename = secure_filename(file.filename)
             unique_filename = f"{current_user.username}_{timestamp}_{original_filename}"
             
-            # Ensure upload folder exists
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             
             try:
-                # Save the file
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
                 
-                # Create product with current user's info
-                new_product = AddAgroProduct(
-                    username=current_user.username,
-                    email=current_user.email,
-                    productname=productname,
-                    productdesc=productdesc,
-                    price=price,
-                    image_filename=unique_filename,
-                )
-                
-                db.session.add(new_product)
+                sql = text( """
+                    INSERT INTO addagroproducts 
+                    (username, email, productname, productdesc, price, image_filename)
+                    VALUES (:username, :email, :productname, :productdesc, :price, :image_filename)
+                """)
+                db.session.execute(sql, {
+                    'username': current_user.username,
+                    'email': current_user.email,
+                    'productname': productname,
+                    'productdesc': productdesc,
+                    'price': price,
+                    'image_filename': unique_filename
+                })
                 db.session.commit()
+                
                 flash("Product Added Successfully", "success")
                 return redirect(url_for('agroproducts'))
-                
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error saving product: {str(e)}', 'danger')
                 return redirect(request.url)
-                
         else:
             flash('Allowed image types are: png, jpg, jpeg, gif', 'danger')
             return redirect(request.url)
     
-    # GET request - show form
     return render_template('addagroproducts.html')
+
 
 @app.route('/triggers')
 @login_required
@@ -405,10 +831,27 @@ def edit(rid):
     farming=Farming.query.all()
     return render_template('edit.html',posts=posts,farming=farming)
 
-@app.route('/editagro/<int:pid>')
+@app.route('/edit_agro/<int:pid>', methods=['GET', 'POST'])
 @login_required
 def edit_agro(pid):
-    product = AddAgroProduct.query.get_or_404(pid)  # Changed to use AddAgroProduct
+    if request.method == 'POST':
+        # Using raw SQL
+        db.session.execute(text("""
+            UPDATE addagroproduct 
+            SET productname = :productname, 
+                productdesc = :productdesc, 
+                price = :price 
+            WHERE pid = :pid
+        """), {
+            'productname': request.form['productname'],
+            'productdesc': request.form['productdesc'],
+            'price': request.form['price'],
+            'pid': pid
+        })
+        db.session.commit()
+        return redirect(url_for('some_route_after_update'))
+    
+    product = AddAgroProduct.query.get_or_404(pid)
     return render_template('editagroproduct.html', product=product)
 
 @app.route('/updateagroproduct/<int:pid>', methods=['POST'])
@@ -467,8 +910,6 @@ def signup():
         db.session.commit()
         flash("Signup Succes Please Login","success")
         return render_template('login.html')
-
-          
 
     return render_template('signup.html')
 
