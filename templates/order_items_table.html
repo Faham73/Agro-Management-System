@@ -1,0 +1,45 @@
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Order Items</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {% if item.image_url %}
+                                <img src="{{ item.image_url }}" class="img-thumbnail me-3" style="width:60px;height:60px;object-fit:cover">
+                                {% endif %}
+                                <div>
+                                    <h6 class="mb-0">{{ item.product_name }}</h6>
+                                    <small class="text-muted">Product ID: {{ item.product_id }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>₹{{ "%.2f"|format(item.price) }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>₹{{ "%.2f"|format(item.price * item.quantity) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-active">
+                        <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                        <td><strong>₹{{ "%.2f"|format(order.total_amount) }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>

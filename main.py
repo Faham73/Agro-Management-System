@@ -13,6 +13,7 @@ from flask import session
 from sqlalchemy import text
 from flask import send_from_directory
 from flask import request, flash, redirect, url_for, render_template
+from flask import Flask, render_template, request, redirect, url_for, flash, session, abort
 
 
 # MY db connection
@@ -108,12 +109,230 @@ def index():
 def static_files(filename):
     return send_from_directory('static', filename)
 
+#admin pages
+
+
 @app.route('/farmerdetails')
 @login_required
 def farmerdetails():
-    # query=db.engine.execute(f"SELECT * FROM `register`") 
-    query=Register.query.all()
-    return render_template('farmerdetails.html',query=query)
+    if current_user.role != 'admin':
+        abort(403)
+    
+    # Fetch only workers from the user table
+    workers = db.session.execute(
+        text("SELECT * FROM user WHERE role = 'worker'")
+    ).fetchall()
+    return render_template('farmerdetails.html', workers=workers)
+
+@app.route('/edit_worker/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_worker(id):
+    if current_user.role != 'admin':
+        abort(403)
+    
+    worker = db.session.execute(
+        text("SELECT * FROM user WHERE id = :id AND role = 'worker'"),
+        {'id': id}
+    ).fetchone()
+    
+    if not worker:
+        abort(404)
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        role = request.form['role']
+        
+        # Validate role to prevent changing to admin
+        if role not in ['worker', 'customer']:
+            flash('Invalid role selected', 'danger')
+            return redirect(url_for('edit_worker', id=id))
+        
+        db.session.execute(
+            text("UPDATE user SET username = :username, email = :email, role = :role WHERE id = :id"),
+            {'username': username, 'email': email, 'role': role, 'id': id}
+        )
+        db.session.commit()
+        flash('Worker updated successfully', 'success')
+        return redirect(url_for('farmerdetails'))
+    
+    return render_template('edit_worker.html', worker=worker)
+
+@app.route('/delete_worker/<int:id>')
+@login_required
+def delete_worker(id):
+    if current_user.role != 'admin':
+        abort(403)
+    
+    # Ensure we're only deleting workers
+    result = db.session.execute(
+        text("DELETE FROM user WHERE id = :id AND role = 'worker'"),
+        {'id': id}
+    )
+    db.session.commit()
+    
+    if result.rowcount == 0:
+        flash('Worker not found or cannot be deleted', 'danger')
+    else:
+        flash('Worker deleted successfully', 'success')
+    
+    return redirect(url_for('farmerdetails'))
+
+
+@app.route('/order_management')
+@login_required
+def order_management():
+    if current_user.role != 'admin':
+        abort(403)
+    
+    status_filter = request.args.get('status')
+    
+    query = """
+    SELECT 
+        p.payment_id,
+        u.username as customer_name,
+        u.id as customer_id,
+        p.payment_date as order_date,
+        SUM(oi.price * oi.quantity) as total_amount,
+        (SELECT status FROM order_tracking 
+         WHERE payment_id = p.payment_id 
+         ORDER BY update_time DESC LIMIT 1) as status,
+        COUNT(oi.order_item_id) as item_count,
+        MAX(ot.update_time) as last_update
+    FROM payments p
+    JOIN user u ON p.user_id = u.id
+    JOIN order_items oi ON p.payment_id = oi.payment_id
+    LEFT JOIN order_tracking ot ON p.payment_id = ot.payment_id
+    """
+    
+    params = {}
+    if status_filter:
+        query += " WHERE (SELECT status FROM order_tracking WHERE payment_id = p.payment_id ORDER BY update_time DESC LIMIT 1) = :status"
+        params['status'] = status_filter
+    
+    query += " GROUP BY p.payment_id, u.username, u.id, p.payment_date ORDER BY p.payment_date DESC"
+    
+    try:
+        result = db.session.execute(text(query), params)
+        
+        # Properly convert result to list of dictionaries
+        orders = []
+        for row in result:
+            order = {
+                'payment_id': row.payment_id,
+                'customer_name': row.customer_name,
+                'customer_id': row.customer_id,
+                'order_date': row.order_date or datetime.now(),  # Handle None
+                'total_amount': float(row.total_amount) if row.total_amount else 0.0,
+                'status': row.status or 'processing',
+                'item_count': row.item_count,
+                'last_update': row.last_update or datetime.now()
+            }
+            orders.append(order)
+            
+        return render_template('order_management.html', 
+                            orders=orders, 
+                            current_filter=status_filter)
+        
+    except Exception as e:
+        flash(f"Database error: {str(e)}", "danger")
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/order_details/<int:payment_id>')
+@login_required
+def order_details(payment_id):
+    # Verify order belongs to customer (unless admin)
+    query = """
+    SELECT p.*, u.username, u.email,
+           (SELECT status FROM order_tracking 
+            WHERE payment_id = p.payment_id 
+            ORDER BY update_time DESC LIMIT 1) as status
+    FROM payments p
+    JOIN user u ON p.user_id = u.id
+    WHERE p.payment_id = :payment_id
+    """
+    
+    params = {'payment_id': payment_id}
+    
+    if current_user.role != 'admin':
+        query += " AND p.user_id = :user_id"
+        params['user_id'] = current_user.id
+    
+    order = db.session.execute(text(query), params).fetchone()
+    
+    if not order:
+        abort(404)  # This will now work after adding the import
+    
+    items = db.session.execute(
+        text("""
+        SELECT oi.*, a.productname as product_name, a.price, a.image_filename
+        FROM order_items oi
+        JOIN addagroproducts a ON oi.product_id = a.pid
+        WHERE oi.payment_id = :payment_id
+        """),
+        {'payment_id': payment_id}
+    ).fetchall()
+    
+    return render_template('order_details.html', 
+                         order=order, 
+                         items=items,
+                         is_admin=current_user.role == 'admin')
+    
+@app.route('/order_history')
+@login_required
+def order_history():
+    orders = db.session.execute(
+        text("""
+        SELECT 
+            p.payment_id, 
+            p.payment_date, 
+            p.total_amount,  # Changed from amount to total_amount
+            (SELECT status FROM order_tracking 
+             WHERE payment_id = p.payment_id 
+             ORDER BY update_time DESC LIMIT 1) as status,
+            COUNT(oi.order_item_id) as item_count
+        FROM payments p
+        JOIN order_items oi ON p.payment_id = oi.payment_id
+        WHERE p.user_id = :user_id
+        GROUP BY p.payment_id, p.payment_date, p.total_amount  # Added all non-aggregated columns
+        ORDER BY p.payment_date DESC
+        """),
+        {'user_id': current_user.id}
+    ).fetchall()
+    
+    return render_template('order_history.html', orders=orders)
+
+# Order Status Update (for orders)
+@app.route('/update_order_status/<int:payment_id>', methods=['POST'])
+@login_required
+def update_order_status(payment_id):
+    if current_user.role not in ['admin', 'worker']:
+        abort(403)
+    
+    new_status = request.form.get('status')  # Get status from form data
+    valid_statuses = ['processing', 'shipped', 'delivered', 'cancelled']
+    
+    # Change from 'status' to 'new_status' in this check:
+    if new_status not in valid_statuses:
+        flash('Invalid status selected', 'danger')
+        return redirect(url_for('order_details', payment_id=payment_id))
+    
+    try:
+        db.session.execute(
+            text("""
+            INSERT INTO order_tracking (payment_id, status)
+            VALUES (:payment_id, :status)
+            """),
+            {'payment_id': payment_id, 'status': new_status}
+        )
+        db.session.commit()
+        flash(f'Status updated to {new_status}', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating status: {str(e)}', 'danger')
+    
+    return redirect(url_for('order_details', payment_id=payment_id))
+
 
 # For workers to see only their products
 @app.route('/agroproducts')
@@ -490,9 +709,9 @@ def my_orders():
 
     return render_template('my_orders.html', orders=orders)
 
-@app.route('/order_details/<int:payment_id>')
+@app.route('/payment_details/<int:payment_id>')
 @login_required
-def order_details(payment_id):
+def view_payment_details(payment_id):
     if current_user.role != 'customer':
         abort(403)
     
@@ -544,7 +763,7 @@ def order_details(payment_id):
         {'payment_id': payment_id}
     ).fetchall()
 
-    return render_template('order_details.html',
+    return render_template('payment_details.html',
                          order=order_info,
                          items=items,
                          tracking=tracking)
@@ -646,34 +865,25 @@ def worker_order_details(payment_id):
                          tracking=tracking,
                          status_options=status_options)
 
-@app.route('/update_order_status/<int:payment_id>', methods=['POST'])
+# Payment Status Update (separate endpoint)
+@app.route('/update_payment_status/<int:payment_id>', methods=['POST'], endpoint='update_payment_status_view')
 @login_required
-def update_order_status(payment_id):
-    if current_user.role != 'worker':
+def update_payment_status(payment_id):
+    if current_user.role != 'admin':
         abort(403)
     
+    # Your payment status update logic here
+    # Example:
     new_status = request.form.get('status')
-    notes = request.form.get('notes', '')
-
-    try:
-        db.session.execute(
-            text("""
-            INSERT INTO order_tracking (payment_id, status, notes)
-            VALUES (:payment_id, :status, :notes)
-            """),
-            {
-                'payment_id': payment_id,
-                'status': new_status,
-                'notes': notes
-            }
-        )
-        db.session.commit()
-        flash('Order status updated successfully!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error updating status: {str(e)}', 'danger')
+    db.session.execute(
+        text("UPDATE payments SET status = :status WHERE id = :payment_id"),
+        {'status': new_status, 'payment_id': payment_id}
+    )
+    db.session.commit()
     
-    return redirect(url_for('worker_order_details', payment_id=payment_id))
+    flash('Payment status updated', 'success')
+    return redirect(url_for('payment_details_view', payment_id=payment_id))
+
 
 @app.route('/addagroproduct', methods=['POST','GET'])
 @login_required

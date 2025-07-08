@@ -93,25 +93,15 @@
         </div>
         <div class="card-body">
           <form method="POST" action="{{ url_for('update_order_status', payment_id=order.payment_id) }}">
-            <div class="mb-3">
-              <label for="status" class="form-label">Status</label>
-              <select class="form-select" id="status" name="status" required>
-                {% for value, label in status_options %}
-                <option value="{{ value }}" 
-                  {% if tracking and tracking[0].status == value %}selected{% endif %}>
-                  {{ label }}
-                </option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="mb-3">
-              <label for="notes" class="form-label">Notes (Optional)</label>
-              <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">
-              Update Status
-            </button>
-          </form>
+    <select name="status" class="form-select mb-3" required>
+        <option value="processing" {% if order.status == 'processing' %}selected{% endif %}>Processing</option>
+        <option value="shipped" {% if order.status == 'shipped' %}selected{% endif %}>Shipped</option>
+        <option value="delivered" {% if order.status == 'delivered' %}selected{% endif %}>Delivered</option>
+    </select>
+    <button type="submit" class="btn btn-primary">
+        <i class="fas fa-save"></i> Update Status
+    </button>
+</form>
         </div>
       </div>
 

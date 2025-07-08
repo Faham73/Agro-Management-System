@@ -58,10 +58,7 @@
                     
                     <!-- Admin specific items -->
                     {% if current_user.role == 'admin' %}
-                        <li><a href="/user_management">Manage Users</a></li>
-                        <li><a href="/system_settings">System Settings</a></li>
-                        <li><a href="/farmer_registry">Farmer Registry</a></li>
-                        <li><a href="/addfarming">Add Farming</a></li>
+                        <li><a href="/order_management">Order Management</a></li>
                         <li><a href="/farmerdetails">Farmer Details</a></li>
                         <li><a href="/task_management">Task Management</a></li>
                         <li><a href="/triggers">Records</a></li>
@@ -93,39 +90,32 @@
     </div>
 </header>
 <!-- ======= Intro Section ======= -->
- <section id="intro">
+<section id="intro">
     <div class="intro-container" data-aos="zoom-in" data-aos-delay="100">
-      <h1 class="mb-4 pb-0">SELL AGRO PRODUCTS AND BUY  </span> </h1>
-      <p class="mb-4 pb-0">DBMS Mini Project Using Flask & MYSQL</p>
-      <p>Authenticated: {{ current_user.is_authenticated }}</p>
-<p>Role: {{ current_user.role }}</p>
-<p>Username: {{ current_user.username }}</p>
-
-    
-      <a href="/agroproducts" class="about-btn scrollto">AGRO PRODUCTS</a>
+        <h1 class="mb-4 pb-0">SELL AGRO PRODUCTS AND BUY</h1>
+        <p class="mb-4 pb-0">DBMS Mini Project Using Flask & MYSQL</p>
+        <p>Authenticated: {{ current_user.is_authenticated }}</p>
+        <p>Role: {{ current_user.role }}</p>
+        <p>Username: {{ current_user.username }}</p>
+        <a href="/agroproducts" class="about-btn scrollto">AGRO PRODUCTS</a>
     </div>
-  </section><!-- End Intro Section -->
+</section><!-- End Intro Section -->
 
-  <main id="main">
+<main id="main">
+    {% with messages=get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+                    {{message}}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-
-  {% block body %}
-  
-{% with messages=get_flashed_messages(with_categories=true) %}
-{% if messages %}
-{% for category, message in messages %}
-
-<div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
-    {{message}}
-
-
-</div>
-
-
-  {% endfor %}
-  {% endif %}
-  {% endwith %}
-  {% endblock body %}
+    {% block body %}{% endblock %}
+    {% block content %}{% endblock %}  <!-- Add this line -->
+</main>
 
 
   <a href="#" class="back-to-top"><i class="fa fa-angle-up"></i></a>

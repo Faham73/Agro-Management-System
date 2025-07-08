@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Order Management{% endblock %}
+
+{% block content %}  <!-- Changed from body to content -->
+<div class="container mt-5">
+    <h2 class="text-center mb-4"><i class="fas fa-clipboard-list"></i> Order Management</h2>
+    
+    <!-- Status Filter Tabs -->
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link {% if not current_filter %}active{% endif %}" 
+               href="{{ url_for('order_management') }}">All Orders</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_filter == 'processing' %}active{% endif %}" 
+               href="{{ url_for('order_management', status='processing') }}">Processing</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_filter == 'shipped' %}active{% endif %}" 
+               href="{{ url_for('order_management', status='shipped') }}">Shipped</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_filter == 'delivered' %}active{% endif %}" 
+               href="{{ url_for('order_management', status='delivered') }}">Delivered</a>
+        </li>
+    </ul>
+
+    <!-- Orders Table -->
+    <div class="table-responsive">
+        <table class="table table-hover align-middle shadow-sm border">
+            <thead class="table-dark">
+                <tr>
+                    <th>Payment ID</th>
+                    <th>Customer</th>
+                    <th>Date</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Last Update</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>{{ order.payment_id }}</td>
+                    <td>{{ order.customer_name }} (ID: {{ order.customer_id }})</td>
+                    <td>{{ order.order_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ order.item_count }}</td>
+                    <td>₹{{ "%.2f"|format(order.total_amount) }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if order.status == 'processing' %}bg-warning text-dark
+                            {% elif order.status == 'shipped' %}bg-info
+                            {% elif order.status == 'delivered' %}bg-success
+                            {% else %}bg-secondary{% endif %}">
+                            {{ order.status|capitalize }}
+                        </span>
+                    </td>
+                    <td>{{ order.last_update.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        <a href="{{ url_for('order_details', payment_id=order.payment_id) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        {% if current_user.role == 'admin' %}
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                    data-bs-toggle="dropdown">
+                                Update Status
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a href="{{ url_for('update_order_status_view', payment_id=order.payment_id, status='processing') }}">Processing</a></li>
+                                <li><a href="{{ url_for('update_order_status_view', payment_id=order.payment_id, status='shipped') }}">Shipped</a></li>
+                                <li><a href="{{ url_for('update_order_status_view', payment_id=order.payment_id, status='delivered') }}">Delivered</a></li>
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center">No orders found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
