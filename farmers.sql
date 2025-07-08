@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 05, 2025 at 07:18 PM
+-- Generation Time: Jul 08, 2025 at 02:19 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -44,13 +44,10 @@ CREATE TABLE `addagroproducts` (
 --
 
 INSERT INTO `addagroproducts` (`username`, `email`, `pid`, `productname`, `productdesc`, `price`, `worker_id`, `image_filename`, `user_id`) VALUES
-('test', 'test@gmail.com', 1, 'GIRIJA CAULIFLOWER', ' Tips for Growing Cauliflower. Well drained medium loam and or sandy loam soils are suitable.', 520, NULL, '', NULL),
 ('test', 'test@gmail.com', 2, 'COTTON', 'Cotton is a soft, fluffy staple fiber that grows in a boll,around the seeds of the cotton ', 563, NULL, '', NULL),
-('arkpro', 'arkpro@gmail.com', 3, 'silk', 'silk is best business developed from coocon for saries preparation and so on', 582, 5, '', NULL),
 ('faham', 'towhidurfaham@gmail.com', 5, 'TOMATO', 'Fresh tomatoes', 300, 6, 'faham_TOMATO_istockphoto-171579643-612x612.jpg', NULL),
-('shohan', 'shohan@gmail.com', 6, 'CHILI PAPPER', 'Spicy and Healthy Red Chili Paper', 140, 7, 'shohan_20250609_130042_61c974S9eL._AC_UF10001000_QL80_.jpg', NULL),
+('shohan', 'shohan@gmail.com', 6, 'CHILI PAPPER', 'Healthy Red Chili Paper', 140, 7, 'shohan_20250609_130042_61c974S9eL._AC_UF10001000_QL80_.jpg', NULL),
 ('nazib', 'nazib@gamil.com', 7, 'rice', 'Very healthy rice', 250, 14, 'nazib_20250617_102410_istockphoto-171579643-612x612.jpg', NULL),
-('efath', 'efath@gmail.com', 8, 'TOMATO', 'Fresh healthy tomato', 250, 15, 'efath_20250622_113425_istockphoto-171579643-612x612.jpg', NULL),
 ('shohan', 'shohan@gmail.com', 9, 'tea', 'tea', 320, 7, 'shohan_20250629_113737_pexels-roman-odintsov-8528937.jpg', NULL);
 
 -- --------------------------------------------------------
@@ -144,8 +141,10 @@ INSERT INTO `order_items` (`order_item_id`, `payment_id`, `product_id`, `quantit
 (1, 1, 2, 2, 563.00),
 (2, 1, 6, 1, 140.00),
 (3, 1, 9, 1, 320.00),
-(4, 2, 3, 1, 582.00),
-(5, 3, 6, 3, 140.00);
+(5, 3, 6, 3, 140.00),
+(6, 4, 6, 1, 140.00),
+(7, 5, 7, 3, 250.00),
+(8, 6, 9, 1, 320.00);
 
 -- --------------------------------------------------------
 
@@ -168,7 +167,21 @@ CREATE TABLE `order_tracking` (
 INSERT INTO `order_tracking` (`tracking_id`, `payment_id`, `status`, `update_time`, `notes`) VALUES
 (1, 1, 'shipped', '2025-07-05 14:26:21', ''),
 (2, 1, 'processing', '2025-07-05 14:26:34', ''),
-(3, 1, 'delivered', '2025-07-05 14:26:43', '');
+(3, 1, 'delivered', '2025-07-05 14:26:43', ''),
+(4, 3, 'processing', '2025-07-05 17:42:14', ''),
+(5, 3, 'shipped', '2025-07-05 17:42:21', ''),
+(6, 3, 'delivered', '2025-07-05 17:42:29', ''),
+(7, 3, 'processing', '2025-07-05 17:42:37', ''),
+(8, 4, 'shipped', '2025-07-05 17:46:17', ''),
+(9, 4, 'processing', '2025-07-05 17:46:25', ''),
+(10, 4, 'delivered', '2025-07-05 17:46:31', ''),
+(11, 4, 'delivered', '2025-07-05 17:59:48', 'just deliverd'),
+(12, 4, 'processing', '2025-07-06 14:56:12', ''),
+(13, 4, 'cancelled', '2025-07-06 14:56:32', ''),
+(14, 6, 'shipped', '2025-07-08 06:21:20', NULL),
+(15, 6, 'shipped', '2025-07-08 06:24:13', NULL),
+(16, 6, 'processing', '2025-07-08 06:25:03', NULL),
+(17, 6, 'shipped', '2025-07-08 06:25:11', NULL);
 
 -- --------------------------------------------------------
 
@@ -193,7 +206,10 @@ CREATE TABLE `payments` (
 INSERT INTO `payments` (`payment_id`, `user_id`, `total_amount`, `payment_date`, `payment_status`, `delivery_address`, `contact_number`) VALUES
 (1, 12, 1586.00, '2025-07-05 14:04:20', 'completed', NULL, NULL),
 (2, 12, 582.00, '2025-07-05 14:56:17', 'completed', NULL, NULL),
-(3, 12, 420.00, '2025-07-05 17:11:08', 'completed', NULL, NULL);
+(3, 12, 420.00, '2025-07-05 17:11:08', 'completed', NULL, NULL),
+(4, 12, 140.00, '2025-07-05 17:44:38', 'completed', NULL, NULL),
+(5, 12, 750.00, '2025-07-06 14:51:56', 'completed', NULL, NULL),
+(6, 12, 320.00, '2025-07-08 05:58:20', 'completed', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -292,14 +308,12 @@ CREATE TABLE `user` (
 --
 
 INSERT INTO `user` (`id`, `username`, `email`, `password`, `role`) VALUES
-(5, 'arkpro', 'arkpro@gmail.com', 'pbkdf2:sha256:150000$TfhDWqOr$d4cf40cc6cbfccbdcd1410f9e155ef2aa660620b0439a60c4d74085dbf007a4a', 'worker'),
 (6, 'faham', 'towhidurfaham@gmail.com', '73', 'worker'),
 (7, 'shohan', 'shohan@gmail.com', '1234', 'worker'),
 (11, 'usama', 'usama@gmail.com', '91', 'admin'),
 (12, 'nahid', 'nahid@gmail.com', '61', 'customer'),
 (13, 'redoy', 'redoy@gmail.com', '11', 'customer'),
 (14, 'nazib', 'nazib@gamil.com', '07', 'worker'),
-(15, 'efath', 'efath@gmail.com', '39', 'worker'),
 (16, 'rafid', 'rafid@gmail.com', 'rafid123', 'admin'),
 (17, 'zidan', 'zidan@gmail.com', '69', 'customer');
 
@@ -313,7 +327,7 @@ INSERT INTO `user` (`id`, `username`, `email`, `password`, `role`) VALUES
 ALTER TABLE `addagroproducts`
   ADD PRIMARY KEY (`pid`),
   ADD KEY `fk_user_id` (`user_id`),
-  ADD KEY `worker_id` (`worker_id`);
+  ADD KEY `addagroproducts_ibfk_1` (`worker_id`);
 
 --
 -- Indexes for table `agroproducts`
@@ -348,7 +362,7 @@ ALTER TABLE `farming`
 ALTER TABLE `order_items`
   ADD PRIMARY KEY (`order_item_id`),
   ADD KEY `payment_id` (`payment_id`),
-  ADD KEY `product_id` (`product_id`);
+  ADD KEY `order_items_ibfk_2` (`product_id`);
 
 --
 -- Indexes for table `order_tracking`
@@ -414,7 +428,7 @@ ALTER TABLE `carts`
 -- AUTO_INCREMENT for table `cart_items`
 --
 ALTER TABLE `cart_items`
-  MODIFY `cart_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `cart_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `farming`
@@ -426,19 +440,19 @@ ALTER TABLE `farming`
 -- AUTO_INCREMENT for table `order_items`
 --
 ALTER TABLE `order_items`
-  MODIFY `order_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `order_item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `order_tracking`
 --
 ALTER TABLE `order_tracking`
-  MODIFY `tracking_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `tracking_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `register`
@@ -472,7 +486,7 @@ ALTER TABLE `user`
 -- Constraints for table `addagroproducts`
 --
 ALTER TABLE `addagroproducts`
-  ADD CONSTRAINT `addagroproducts_ibfk_1` FOREIGN KEY (`worker_id`) REFERENCES `user` (`id`),
+  ADD CONSTRAINT `addagroproducts_ibfk_1` FOREIGN KEY (`worker_id`) REFERENCES `user` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`);
 
 --
@@ -493,7 +507,7 @@ ALTER TABLE `cart_items`
 --
 ALTER TABLE `order_items`
   ADD CONSTRAINT `order_items_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`payment_id`),
-  ADD CONSTRAINT `order_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `addagroproducts` (`pid`);
+  ADD CONSTRAINT `order_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `addagroproducts` (`pid`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `order_tracking`
